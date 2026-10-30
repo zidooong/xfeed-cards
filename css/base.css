@@ -1,0 +1,37 @@
+/* XFeed v2 — 公共基础 */
+:root{
+  --safe-top:max(env(safe-area-inset-top),var(--tg-content-safe-area-inset-top,0px));
+  --safe-bot:max(env(safe-area-inset-bottom),var(--tg-safe-area-inset-bottom,0px));
+  --vh:var(--tg-viewport-stable-height,100dvh);
+  --ease:cubic-bezier(.2,.8,.2,1);
+  -webkit-text-size-adjust:100%;
+  text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);overscroll-behavior:none;overflow:hidden}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0;margin:0}
+button:disabled{cursor:default}
+a{color:inherit}
+h1,h2,h3,h4,p,ol,ul,dl,dd,figure{margin:0;padding:0}
+ol,ul{list-style:none}
+#app{height:var(--vh);display:flex;flex-direction:column;padding-top:var(--safe-top);padding-bottom:var(--safe-bot);user-select:none;-webkit-user-select:none}
+.ic{width:18px;height:18px;flex:none;display:block}
+.stage{flex:1;position:relative;min-height:0}
+.stack{position:absolute;inset:0}
+.card{position:absolute;inset:0;overflow:hidden;display:flex;flex-direction:column;will-change:transform;touch-action:none;cursor:grab;transform-origin:50% 90%;
+  --pl:0;--pn:0;--ps:0;--reveal:1}
+.card.dragging{cursor:grabbing}
+.card.behind{pointer-events:none}
+.card img{display:block;-webkit-user-drag:none;pointer-events:none}
+.endview{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;user-select:text;-webkit-user-select:text}
+.controls.gone,.dock.gone{opacity:0;pointer-events:none;transform:translateY(8px)}
+.sheet-mask{position:fixed;inset:0;z-index:20;opacity:0;transition:opacity .25s}
+.sheet-mask.open{opacity:1}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-height:72%;overflow:auto;padding:8px 20px calc(24px + var(--safe-bot));transform:translateY(100%);transition:transform .32s var(--ease)}
+.sheet.open{transform:none}
+.sheet-grip{width:36px;height:4px;border-radius:2px;margin:4px auto 14px}
+.toast{position:fixed;left:50%;top:calc(60px + var(--safe-top));transform:translate(-50%,-8px);padding:8px 14px;font-size:13px;opacity:0;transition:.22s var(--ease);pointer-events:none;z-index:30;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.num,.mono{font-variant-numeric:tabular-nums}
+@keyframes bump{40%{transform:scale(1.12)}}
+.bump{animation:bump .4s var(--ease)}

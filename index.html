@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#000000">
+<title>XFeed 每日简报</title>
+<!-- Telegram Mini App SDK 已去掉：iOS WKWebView 同步拉 telegram.org 会整页卡死全黑 -->
+<script>
+  // ?theme=a|b|c|d|hybrid 选择视觉方向（默认 d / hybrid）。d/hybrid = B 暗色工具风 + A 单卡布局，无 UP NEXT。
+  // 样式与字体同步写入，避免闪烁。Geist 自托管（中国无法拉 Google Fonts）；A/C 用系统/CJK 回退。
+  (function () {
+    var raw = (new URLSearchParams(location.search).get('theme') || 'd').toLowerCase();
+    if (raw === 'hybrid') raw = 'd';
+    var t = raw;
+    if (['a', 'b', 'c', 'd'].indexOf(t) < 0) t = 'd';
+    var links = '';
+    if (t === 'b' || t === 'd') {
+      links += '<link rel="stylesheet" href="css/fonts-geist.css">';
+    } else if (t === 'a') {
+      // 可选：若外网可达再拉 Noto Serif；失败则走系统衬线回退（Songti / Source Han）
+      links += '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&display=swap">';
+    } else if (t === 'c') {
+      links += '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap">';
+    }
+    document.write(links + '<link rel="stylesheet" href="css/base.css"><link rel="stylesheet" href="css/' + t + '.css">');
+    window.__XF_ENGINE = t === 'c' ? 'js/feed.js' : 'js/stack.js';
+    window.__XF_THEME = t;
+  })();
+</script>
+</head>
+<body>
+<div id="app"></div>
+<script src="vendor/html2canvas.min.js"></script>
+<script src="js/core.js"></script>
+<script>document.write('<script src="' + window.__XF_ENGINE + '"><\/script>');</script>
+</body>
+</html>

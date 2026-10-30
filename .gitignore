@@ -1,0 +1,11 @@
+.DS_Store
+.env
+.env.*
+*.pem
+*.key
+auth.json
+**/FEEDBACK_TOKEN*
+.herenow/
+server/
+*.local
+secrets/
