@@ -1,5 +1,7 @@
 # 每日更新流程（简版）
 
+> Auto-publish ON (2026-10-31): Claw `xfeed-memo.sh` → `xfeed-cards.sh` → `xfeed-cards-publish.sh` pushes `data/` + `thumbs/` + `memos/` to `main` after each successful daily memo. No manual 推 needed for the daily path.
+
 1. **Claw / 管线** 生成当日 memo（MD）与卡片 JSON。
 2. **写入本仓** `data/YYYY-MM-DD.json`，可选 `memos/YYYY-MM-DD.md`。
 3. **刷新** `data/index.json`（`latest` + `dates`）。
