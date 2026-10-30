@@ -97,6 +97,11 @@ let toastT;
 function toast(msg) { const t = $('#toast'); if (!t) return; t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1400); }
 function openLink(url) {
   if (!url) return;
+  // 进外链前先清 drag / sheet / pointer，避免回前台假死（尤其开 X App）
+  try {
+    if (window.XFeed && typeof window.XFeed.prepareForExternal === 'function') window.XFeed.prepareForExternal();
+    else if (window.XFeed && typeof window.XFeed.resumeFromExternal === 'function') window.XFeed.resumeFromExternal();
+  } catch (e) {}
   if (inTg) {
     tg.openLink(url, { try_instant_view: !/x\.com|twitter\.com/.test(url) });
     return;

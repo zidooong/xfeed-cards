@@ -435,6 +435,8 @@ function bindDrag(el) {
   const end = e => {
     if (!drag || drag.el !== el || e.pointerId !== drag.id) return;
     const d = drag; drag = null; el.classList.remove('dragging'); el.dataset.zone = '';
+    // 外链 / 进后台前必须放掉 capture，否则回前台 WK 触控会假死
+    try { if (d.id != null) el.releasePointerCapture(d.id); } catch (err) {}
     const s0 = d.samples[0], s1 = d.samples[d.samples.length - 1], dt = Math.max(16, s1[0] - s0[0]);
     const vx = (s1[1] - s0[1]) / dt, vy = (s1[2] - s0[2]) / dt;
     if (!d.moved && performance.now() - d.t0 < 400 && e.type === 'pointerup') {
@@ -473,7 +475,7 @@ function spring(el, x, y, vx, vy, rotSign) {
 function cancelSpring(el) { if (el._raf) cancelAnimationFrame(el._raf); el._raf = 0; }
 
 // ---------- 划走粒子消散（跟手渐散 · 细密物理尘 · 姿态跟随） ----------
-// 默认：iOS 原生 Metal（WK takeSnapshot → 实例粒子）；?dissolve=legacy 才走 html2canvas
+// 默认关：普通位移/旋转/淡出。?dissolve=metal 或 pref=1 才开原生；?dissolve=legacy 才走 html2canvas
 // 禁止：松手先 snap 回中心/0° 再消散；禁止每帧 html2canvas
 const PREF_DISSOLVE = 'xfeed:pref:dissolve';
 /** 原生 Metal 桥是否可用（iOS App 注入 XFEED_NATIVE_DISSOLVE） */
@@ -484,7 +486,7 @@ function nativeDissolveReady() {
   } catch (e) {}
   return false;
 }
-/** legacy = html2canvas CPU 尘；metal = 原生；off = 关 */
+/** legacy = html2canvas CPU 尘；metal = 原生；off = 关（默认） */
 function dissolveMode() {
   const q = (qs.get('dissolve') || '').toLowerCase();
   if (q === '0' || q === 'off' || q === 'false' || q === 'no') return 'off';
@@ -498,8 +500,16 @@ function dissolveMode() {
     if (v === 'legacy') return 'legacy';
     if (v === '1' || v === 'metal' || v === 'on') return nativeDissolveReady() ? 'metal' : 'legacy';
   } catch (e) {}
-  // 默认：有原生则 Metal 开；纯浏览器仍关（避免五毛尘）
-  if (nativeDissolveReady()) return 'metal';
+  // App 注入的默认模式（0.1.19+ 为 off → 普通划卡动画）
+  try {
+    const m = String(window.XFEED_DISSOLVE_MODE || '').toLowerCase();
+    if (m === 'off' || m === '0' || m === 'false' || m === 'no') return 'off';
+    if (m === 'legacy' || m === 'h5' || m === 'canvas') return 'legacy';
+    if (m === 'metal' || m === 'native' || m === 'on' || m === '1') {
+      return nativeDissolveReady() ? 'metal' : 'legacy';
+    }
+  } catch (e) {}
+  // 默认：关粒子，走普通位移/旋转/淡出（代码保留，?dissolve=metal 可再开）
   return 'off';
 }
 function dissolveEnabled() { return dissolveMode() !== 'off'; }
@@ -1134,12 +1144,17 @@ function showEnd() {
   showMainButton();
 }
 function openSheet() {
-  const sh = $('#sheet');
+  const sh = $('#sheet'); const mask = $('#sheetMask');
   sh.innerHTML = THEME === 'd' ? D.sheet() : T.sheet(idsOf('save'));
-  sh.hidden = false; $('#sheetMask').hidden = false;
-  requestAnimationFrame(() => { sh.classList.add('open'); $('#sheetMask').classList.add('open'); });
+  sh.hidden = false; mask.hidden = false; mask.style.pointerEvents = '';
+  requestAnimationFrame(() => { sh.classList.add('open'); mask.classList.add('open'); });
 }
-function closeSheet() { const sh = $('#sheet'); sh.classList.remove('open'); $('#sheetMask').classList.remove('open'); setTimeout(() => { sh.hidden = true; $('#sheetMask').hidden = true; }, 260); }
+function closeSheet() {
+  const sh = $('#sheet'); const mask = $('#sheetMask');
+  sh.classList.remove('open'); mask.classList.remove('open');
+  mask.style.pointerEvents = 'none';
+  setTimeout(() => { sh.hidden = true; mask.hidden = true; }, 260);
+}
 
 // ---------- 事件 ----------
 document.addEventListener('click', e => {
@@ -1167,7 +1182,14 @@ document.addEventListener('click', e => {
     return;
   }
   const l = e.target.closest('[data-link]');
-  if (l) { e.preventDefault(); const c = S.data.cards.find(x => x.url === l.dataset.link); if (c) logEvent('open', c); openLink(l.dataset.link); }
+  if (l) {
+    e.preventDefault();
+    // 列表/sheet 内开原文：先关蒙层，否则回来 sheetMask 继续吃触点
+    try { closeSheet(); } catch (err) {}
+    const c = S.data.cards.find(x => x.url === l.dataset.link);
+    if (c) logEvent('open', c);
+    openLink(l.dataset.link);
+  }
 });
 const _on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
 _on('#btnLike', () => act('like'));
@@ -1185,9 +1207,78 @@ addEventListener('keydown', e => {
   else if (e.key === 'Escape') closeSheet();
 });
 
+/** 外链 / SFSafari / X App 返回后：清卡住的 pointer/drag/蒙层，恢复划卡（幂等） */
+function resumeFromExternal() {
+  try {
+    if (drag && drag.el) {
+      const el = drag.el;
+      try { if (drag.id != null) el.releasePointerCapture(drag.id); } catch (e) {}
+      el.classList.remove('dragging', 'native-dissolving');
+      el.dataset.zone = '';
+      el.style.opacity = '';
+      el.style.transition = '';
+      el.style.transform = '';
+      el.style.pointerEvents = '';
+      try { paint(el, 0, 0); } catch (e) {}
+      try { cancelSpring(el); } catch (e) {}
+    }
+  } catch (e) {}
+  drag = null;
+  try { cancelDust && cancelDust(true); } catch (e) {}
+  // 任意残留 capture：尽量放掉
+  document.querySelectorAll('.card').forEach(el => {
+    try {
+      if (el.hasPointerCapture && el.hasPointerCapture(1)) el.releasePointerCapture(1);
+    } catch (e) {}
+    for (let i = 0; i < 8; i++) {
+      try { if (typeof el.releasePointerCapture === 'function') el.releasePointerCapture(i); } catch (e) {}
+    }
+  });
+  document.querySelectorAll('.card.dragging, .card.native-dissolving, .card.leaving').forEach(el => {
+    el.classList.remove('dragging', 'native-dissolving');
+    if (!el.classList.contains('leaving')) {
+      el.style.opacity = '';
+      el.style.transition = '';
+      el.style.transform = '';
+      el.style.pointerEvents = '';
+      el.dataset.zone = '';
+    }
+  });
+  // 外链返回：强制收起 sheet（即使当时是 open）——蒙层会吃掉全部触点
+  const mask = document.getElementById('sheetMask');
+  const sheet = document.getElementById('sheet');
+  if (mask) {
+    mask.classList.remove('open');
+    mask.hidden = true;
+    mask.style.pointerEvents = 'none';
+  }
+  if (sheet) {
+    sheet.classList.remove('open');
+    sheet.hidden = true;
+  }
+  const dust = document.getElementById('dissolveLayer');
+  if (dust) { dust.style.pointerEvents = 'none'; dust.innerHTML = ''; }
+  try { if (typeof renderStack === 'function' && S && S.pos < S.deck.length) renderStack(); } catch (e) {}
+  return true;
+}
+
+/** 开外链之前调用：释放手势，避免进 X/Safari 时 capture 残留 */
+function prepareForExternal() {
+  try { resumeFromExternal(); } catch (e) {}
+  return true;
+}
+
 window.XFeed = Object.assign(window.XFeed || {}, {
   dissolveEnabled, setDissolvePref, dissolveMode, dissolveMetal, dissolveLegacy, nativeDissolveReady,
+  resumeFromExternal, prepareForExternal,
 });
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    try { resumeFromExternal(); } catch (e) {}
+  }
+});
+addEventListener('pageshow', () => { try { resumeFromExternal(); } catch (e) {} });
 X.loadData().then(({ restored }) => {
   // #pos=N / ?pos=N — 截图与调试跳转（含 cover=0）
   const jump = +(qs.get('pos') || ((location.hash.match(/pos=(\d+)/) || [])[1] || NaN));
